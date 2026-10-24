@@ -53,11 +53,18 @@ function AppContent() {
   }, [activeTab]);
 
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = totalScroll > 0 ? (window.scrollY / totalScroll) * 100 : 0;
-      setScrollProgress(progress);
-      setShowScrollTop(window.scrollY > 400);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
+          const progress = totalScroll > 0 ? (window.scrollY / totalScroll) * 100 : 0;
+          setScrollProgress(progress);
+          setShowScrollTop(window.scrollY > 400);
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -116,7 +123,7 @@ function AppContent() {
       />
 
       {/* Main Pages */}
-      <main className="relative z-10 w-full flex-grow pt-16">
+      <main className="relative z-10 w-full flex-grow pt-14 sm:pt-16">
         {activeTab === 'home' && (
           <HomePage
             onNavigate={handleNavigate}

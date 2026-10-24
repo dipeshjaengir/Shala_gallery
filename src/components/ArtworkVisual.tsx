@@ -29,8 +29,10 @@ export const ArtworkVisual: React.FC<ArtworkVisualProps> = ({
       <div className={`relative overflow-hidden bg-theme-bg-surface flex items-center justify-center ${showFraming ? 'max-h-[60vh] w-auto' : aspectClass} ${className}`}>
         <img
           src={artwork.imageSrc}
-          alt={`${artwork.title} — ${artwork.medium} by Asma Shala`}
+          alt={`${artwork.title} — ${artwork.medium || 'Artwork'} by Asma Shala`}
           onError={() => setImageError(true)}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-contain p-1 transition-transform duration-700 ease-out group-hover:scale-[1.02]"
         />
       </div>

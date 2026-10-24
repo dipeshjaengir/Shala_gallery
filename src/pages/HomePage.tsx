@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { ArtworkWithAsset, ARTWORKS_DATA } from '../data/artworks';
 import { ArtworkCard } from '../components/ArtworkCard';
 import { Button } from '../components/Button';
@@ -20,22 +20,10 @@ export const HomePage: React.FC<HomePageProps> = ({
   const featuredArtworks = ARTWORKS_DATA.filter((a) => a.featured);
   const carouselRef = useRef<HTMLDivElement>(null);
 
-  const scrollPrev = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: -360, behavior: 'smooth' });
-    }
-  };
-
-  const scrollNext = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: 360, behavior: 'smooth' });
-    }
-  };
-
   return (
     <div className="relative z-10 w-full overflow-hidden">
       {/* 1. FULL-SCREEN IMMERSIVE HERO SECTION */}
-      <section className="relative min-h-[100dvh] h-[100dvh] w-full flex items-center justify-center overflow-hidden border-b border-theme-border">
+      <section className="relative w-full h-[calc(100svh-3.5rem)] sm:h-[calc(100svh-4rem)] min-h-[480px] flex items-center justify-center overflow-hidden border-b border-theme-border">
         {/* Full-bleed background image covering the entire viewport */}
         <div className="absolute inset-0 z-0">
           <img
@@ -43,72 +31,65 @@ export const HomePage: React.FC<HomePageProps> = ({
             alt="Asma Shala creating Arabic calligraphy"
             className="w-full h-full object-cover object-[center_35%] sm:object-[center_30%]"
             loading="eager"
+            fetchPriority="high"
+            decoding="async"
           />
           {/* Subtle dark vignette/overlay to ensure text readability while keeping Asma visually prominent */}
-          <div className="absolute inset-0 bg-black/45 sm:bg-black/40" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/40" />
+          <div className="absolute inset-0 bg-black/35 sm:bg-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
         </div>
 
         {/* Content placed directly over the background image */}
-        <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-12 w-full text-center flex flex-col items-center justify-center">
+        <div className="relative z-10 max-w-4xl mx-auto px-6 sm:px-12 w-full text-center flex flex-col items-center justify-center">
           <motion.span
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="text-theme-accent font-sans text-xs md:text-sm tracking-[0.4em] uppercase font-semibold mb-4 block drop-shadow-sm"
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="text-theme-accent font-sans text-[10px] sm:text-xs md:text-sm tracking-[0.3em] sm:tracking-[0.4em] uppercase font-semibold mb-2 sm:mb-4 block drop-shadow-sm"
           >
             FINE ARTIST &bull; CALLIGRAPHER &bull; IRELAND
           </motion.span>
 
           <motion.h1
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-            className="font-serif font-light tracking-widest uppercase leading-[1.08] text-warm-white select-none text-4xl sm:text-6xl md:text-7xl drop-shadow-md"
+            transition={{ delay: 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="font-serif font-light tracking-widest uppercase leading-[1.05] text-warm-white select-none text-3xl sm:text-5xl md:text-6xl lg:text-7xl drop-shadow-md"
           >
             ASMA SHALA
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-            className="font-serif italic lowercase text-warm-white/90 mt-3 text-xl sm:text-2xl md:text-3xl font-light tracking-wide drop-shadow-sm"
+            transition={{ delay: 0.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="font-serif uppercase tracking-[0.24em] sm:tracking-[0.28em] text-warm-white/90 mt-2 sm:mt-3 text-xs sm:text-base md:text-lg font-light drop-shadow-sm"
           >
-            art that holds a story
-          </motion.p>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.9 }}
-            className="font-sans text-xs md:text-sm tracking-[0.2em] uppercase text-warm-white/80 max-w-xl mx-auto mt-4 leading-relaxed drop-shadow-sm"
-          >
-            Original paintings &amp; Arabic calligraphy created to bring character and meaning into personal spaces.
+            Art That Holds A Story
           </motion.p>
 
           {/* Action Buttons directly over background */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45, duration: 0.8 }}
-            className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mt-8 sm:mt-10"
+            transition={{ delay: 0.3, duration: 0.7 }}
+            className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-5 mt-6 sm:mt-8 w-full sm:w-auto max-w-xs sm:max-w-none"
           >
-            <Magnetic range={40} strength={0.3}>
+            <Magnetic range={30} strength={0.25}>
               <Button
                 onClick={() => onNavigate('artwork')}
                 variant="gold"
-                className="shadow-lg"
+                className="w-full sm:w-auto py-3 sm:py-3.5 px-6 sm:px-8 text-[9px] sm:text-[10px] tracking-[0.22em] shadow-lg"
               >
                 EXPLORE EXHIBITION
               </Button>
             </Magnetic>
 
-            <Magnetic range={40} strength={0.3}>
+            <Magnetic range={30} strength={0.25}>
               <Button
                 onClick={() => onNavigate('commissions')}
                 variant="outline"
-                className="text-warm-white border-warm-white/40 hover:border-warm-white bg-black/20 backdrop-blur-xs shadow-lg"
+                className="w-full sm:w-auto py-3 sm:py-3.5 px-6 sm:px-8 text-[9px] sm:text-[10px] tracking-[0.22em] text-warm-white border-warm-white/40 hover:border-warm-white bg-black/25 backdrop-blur-xs shadow-lg"
               >
                 COMMISSION A PIECE
               </Button>
@@ -152,64 +133,38 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* 3. CURATED SELECTION / FEATURED CREATIONS CAROUSEL */}
-      <section id="featured-creations" className="py-20 md:py-28 bg-theme-bg text-theme-text">
+      <section id="featured-creations" className="py-16 sm:py-20 md:py-28 bg-theme-bg text-theme-text">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          {/* Section Header with Carousel Controls */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 text-left border-b border-theme-border pb-6 gap-4">
+          {/* Section Header with Explore All Link */}
+          <div className="flex justify-between items-end mb-8 sm:mb-10 text-left border-b border-theme-border pb-5 sm:pb-6">
             <div>
-              <span className="text-[10px] font-sans tracking-[0.35em] text-theme-accent uppercase font-semibold block mb-2">
+              <span className="text-[10px] font-sans tracking-[0.35em] text-theme-accent uppercase font-semibold block mb-1.5 sm:mb-2">
                 CURATED SELECTION
               </span>
-              <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light uppercase tracking-widest text-theme-text">
+              <h2 className="font-serif text-2xl sm:text-4xl md:text-5xl font-light uppercase tracking-widest text-theme-text">
                 Featured Creations
               </h2>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Previous & Next Carousel Navigation Arrows */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={scrollPrev}
-                  className="p-2.5 rounded-full border border-theme-border bg-theme-bg-card hover:bg-theme-text hover:text-theme-bg transition-colors cursor-pointer text-theme-text"
-                  title="Scroll left"
-                  aria-label="Previous paintings"
-                >
-                  <ChevronLeft size={18} strokeWidth={1.5} />
-                </button>
-                <button
-                  onClick={scrollNext}
-                  className="p-2.5 rounded-full border border-theme-border bg-theme-bg-card hover:bg-theme-text hover:text-theme-bg transition-colors cursor-pointer text-theme-text"
-                  title="Scroll right"
-                  aria-label="Next paintings"
-                >
-                  <ChevronRight size={18} strokeWidth={1.5} />
-                </button>
-              </div>
-
-              <button
-                onClick={() => onNavigate('artwork')}
-                className="font-sans text-[10px] tracking-[0.25em] uppercase text-theme-text-muted hover:text-theme-accent transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium ml-2"
-              >
-                <span>EXPLORE ALL</span>
-                <ArrowRight size={12} />
-              </button>
-            </div>
+            <button
+              onClick={() => onNavigate('artwork')}
+              className="font-sans text-[10px] sm:text-xs tracking-[0.25em] uppercase text-theme-text-muted hover:text-theme-accent transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium shrink-0 pb-1"
+            >
+              <span>EXPLORE ALL</span>
+              <ArrowRight size={13} />
+            </button>
           </div>
 
-          {/* Horizontal Artwork Carousel */}
+          {/* Horizontal Artwork Carousel — Natural Momentum Swiping on Mobile */}
           <div
             ref={carouselRef}
-            className="flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pb-4 pt-1 -mx-2 px-2"
+            className="flex gap-5 sm:gap-8 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pb-4 pt-1 -mx-4 px-4 sm:-mx-2 sm:px-2 touch-pan-x"
             tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowLeft') scrollPrev();
-              if (e.key === 'ArrowRight') scrollNext();
-            }}
           >
             {featuredArtworks.map((artwork) => (
               <div
                 key={artwork.id}
-                className="w-[280px] sm:w-[320px] md:w-[350px] shrink-0 snap-start"
+                className="w-[260px] sm:w-[320px] md:w-[350px] shrink-0 snap-start"
               >
                 <ArtworkCard
                   artwork={artwork}

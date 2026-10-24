@@ -30,8 +30,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="fixed top-0 left-0 w-full z-[99] bg-[#FAF9F6] border-b border-[#E7E2DA] shadow-xs py-3.5 sm:py-4">
-      <div className="max-w-7xl mx-auto px-6 md:px-12 flex justify-between items-center">
+    <header className="fixed top-0 left-0 w-full z-[99] bg-[#FAF9F6] border-b border-[#E7E2DA] shadow-xs h-14 sm:h-16 flex items-center">
+      <div className="max-w-7xl mx-auto px-6 md:px-12 flex justify-between items-center w-full">
         {/* Brand Wordmark */}
         <div
           onClick={() => handleNavClick('home')}
