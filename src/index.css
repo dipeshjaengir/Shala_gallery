@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-gallery-dark: #0C0C0C;
+    --color-gallery-black: #1F1E1B;
+    --color-warm-white: #FAF9F6;
+    --color-soft-white: #F5F5F7;
+
+    /* Light Theme (Permanent Fine Art Portfolio Palette) */
+    --color-theme-bg: #FAF9F6;
+    --color-theme-bg-surface: #F5F5F7;
+    --color-theme-bg-card: #FFFFFF;
+    --color-theme-text: #1F1E1B;
+    --color-theme-text-muted: rgba(31, 30, 27, 0.65);
+    --color-theme-border: rgba(31, 30, 27, 0.1);
+    --color-theme-border-medium: rgba(31, 30, 27, 0.18);
+    --color-theme-accent: #8C7B50;
+  }
+
+  body {
+    background-color: var(--color-theme-bg);
+    color: var(--color-theme-text);
+    font-family: "Outfit", "Inter", sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Scrollbar - Museum aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-theme-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-theme-border-medium);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-theme-accent);
+}
+
+/* Hide scrollbar for clean horizontal carousel */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Editorial paper and frame shadows */
+.shadow-premium {
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
