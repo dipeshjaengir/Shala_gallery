@@ -76,12 +76,22 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       {/* Trademark Line */}
       <div className="max-w-7xl mx-auto mt-12 md:mt-16 pt-8 border-t border-theme-border opacity-70 flex flex-col md:flex-row justify-between items-center gap-4 text-[8px] tracking-[0.3em] uppercase text-theme-text-muted">
         <span>&copy; {currentYear} SHALAGALLERY. ALL RIGHTS RESERVED. ASMA SHALA.</span>
-        <button
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="hover:text-theme-accent transition-colors cursor-pointer"
-        >
-          BACK TO TOP &uarr;
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => onNavigate('admin')}
+            className="hover:text-theme-accent transition-colors opacity-60 hover:opacity-100 cursor-pointer text-[8px] tracking-[0.3em] uppercase"
+            title="Curatorial Portal"
+          >
+            ADMIN
+          </button>
+          <span>&bull;</span>
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="hover:text-theme-accent transition-colors cursor-pointer"
+          >
+            BACK TO TOP &uarr;
+          </button>
+        </div>
       </div>
     </footer>
   );

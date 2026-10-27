@@ -1,0 +1,12 @@
+{
+  "name": "shalagallery-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js",
+    "server": "node index.js",
+    "start": "node index.js"
+  }
+}

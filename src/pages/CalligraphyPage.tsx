@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArtworkWithAsset, ARTWORKS_DATA } from '../data/artworks';
+import { useArtworks } from '../context/ArtworksContext';
 import { ArtworkCard } from '../components/ArtworkCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { SectionContainer } from '../components/SectionContainer';
@@ -7,6 +8,7 @@ import { Button } from '../components/Button';
 import { Shield } from 'lucide-react';
 
 interface CalligraphyPageProps {
+  artworks?: ArtworkWithAsset[];
   onSelectArtwork: (artwork: ArtworkWithAsset) => void;
   onRoomView: (artwork: ArtworkWithAsset) => void;
   onInquire: (artwork: ArtworkWithAsset) => void;
@@ -14,12 +16,15 @@ interface CalligraphyPageProps {
 }
 
 export const CalligraphyPage: React.FC<CalligraphyPageProps> = ({
+  artworks: propArtworks,
   onSelectArtwork,
   onRoomView,
   onInquire,
   onOpenCommission,
 }) => {
-  const calligraphyWorks = ARTWORKS_DATA.filter((a) => a.category === 'Arabic Calligraphy');
+  const { artworks: contextArtworks } = useArtworks();
+  const artworkList = propArtworks || contextArtworks || ARTWORKS_DATA;
+  const calligraphyWorks = artworkList.filter((a) => a.category === 'Arabic Calligraphy');
 
   return (
     <div className="w-full bg-theme-bg text-theme-text pt-4 sm:pt-6 pb-20">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Mail, ArrowUp } from 'lucide-react';
+import { Mail, ArrowUp, Palette } from 'lucide-react';
 import { ThemeProvider } from './utils/ThemeContext';
+import { ArtworksProvider, useArtworks } from './context/ArtworksContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ArtworkModal } from './components/ArtworkModal';
@@ -12,6 +13,7 @@ import { PreviousCommissionsPage } from './pages/PreviousCommissionsPage';
 import { CalligraphyPage } from './pages/CalligraphyPage';
 import { CommissionsPage } from './pages/CommissionsPage';
 import { ContactPage } from './pages/ContactPage';
+import { AdminPortal } from './components/AdminPortal';
 import { ArtworkWithAsset } from './data/artworks';
 
 // Inline Instagram SVG Icon
@@ -34,6 +36,7 @@ const InstagramIcon = ({ size = 15 }: { size?: number }) => (
 );
 
 function AppContent() {
+  const { artworks } = useArtworks();
   const [activeTab, setActiveTab] = useState<string>('home');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [selectedArtwork, setSelectedArtwork] = useState<ArtworkWithAsset | null>(null);
@@ -47,6 +50,14 @@ function AppContent() {
   // Scroll Progress and Back-to-Top
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // Check URL on load for direct access to admin portal (?tab=admin or /admin or token parameter)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'admin' || window.location.pathname === '/admin' || params.has('token') || params.get('action') === 'setup') {
+      setActiveTab('admin');
+    }
+  }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -76,6 +87,19 @@ function AppContent() {
       setCategoryFilter(category);
     }
     setActiveTab(tab);
+    if (tab === 'admin') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', 'admin');
+      window.history.pushState({}, '', url.toString());
+    } else {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') === 'admin') {
+        url.searchParams.delete('tab');
+        url.searchParams.delete('action');
+        url.searchParams.delete('token');
+        window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    }
   };
 
   const handleOpenCommission = () => {
@@ -126,6 +150,7 @@ function AppContent() {
       <main className="relative z-10 w-full flex-grow pt-14 sm:pt-16">
         {activeTab === 'home' && (
           <HomePage
+            artworks={artworks}
             onNavigate={handleNavigate}
             onSelectArtwork={setSelectedArtwork}
             onInquire={handleInquire}
@@ -141,6 +166,7 @@ function AppContent() {
 
         {activeTab === 'artwork' && (
           <AvailableArtworkPage
+            artworks={artworks}
             initialCategory={categoryFilter}
             onSelectArtwork={setSelectedArtwork}
             onRoomView={setRoomViewArtwork}
@@ -151,6 +177,7 @@ function AppContent() {
 
         {activeTab === 'previous-commissions' && (
           <PreviousCommissionsPage
+            artworks={artworks}
             onSelectArtwork={setSelectedArtwork}
             onRoomView={setRoomViewArtwork}
             onInquire={handleInquire}
@@ -160,6 +187,7 @@ function AppContent() {
 
         {activeTab === 'calligraphy' && (
           <CalligraphyPage
+            artworks={artworks}
             onSelectArtwork={setSelectedArtwork}
             onRoomView={setRoomViewArtwork}
             onInquire={handleInquire}
@@ -178,60 +206,91 @@ function AppContent() {
             initialDimensions={inquiryDimensions}
           />
         )}
+
+        {activeTab === 'admin' && (
+          <AdminPortal onNavigate={handleNavigate} />
+        )}
       </main>
 
       {/* Luxury Minimal Footer */}
       <Footer onNavigate={handleNavigate} />
 
-      {/* Floating Action Dock (Matching Lily Portfolio) */}
-      <div
-        className="fixed right-4 sm:right-8 z-[90] flex flex-col gap-2.5 sm:gap-3 items-center"
-        style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
-      >
-        <a
-          href="mailto:shalagallery@gmail.com"
-          className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-text hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
-          title="Email Asma Shala"
-          aria-label="Send email"
+      {/* Floating Action Dock (Hidden in admin mode to prevent overlapping admin controls) */}
+      {activeTab !== 'admin' && (
+        <div
+          className="fixed right-4 sm:right-8 z-[70] flex flex-col gap-2.5 sm:gap-3 items-center"
+          style={{ bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <Mail size={15} />
-        </a>
+          {/* Email Trigger */}
+          <div className="relative group flex items-center">
+            <span className="pointer-events-none absolute right-full mr-2.5 px-2 py-1 rounded bg-[#1F1E1B] text-[#FAF9F6] dark:bg-[#FAF9F6] dark:text-[#1F1E1B] text-[9px] tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md">
+              Email
+            </span>
+            <a
+              href="mailto:shalagallery@gmail.com"
+              className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-text hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
+              title="Email Asma Shala"
+              aria-label="Send email to Asma Shala"
+            >
+              <Mail size={15} />
+            </a>
+          </div>
 
-        <a
-          href="https://www.instagram.com/shalagallery/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-text hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
-          title="Instagram @shalagallery"
-          aria-label="Instagram profile"
-        >
-          <InstagramIcon size={15} />
-        </a>
+          {/* Instagram Trigger */}
+          <div className="relative group flex items-center">
+            <span className="pointer-events-none absolute right-full mr-2.5 px-2 py-1 rounded bg-[#1F1E1B] text-[#FAF9F6] dark:bg-[#FAF9F6] dark:text-[#1F1E1B] text-[9px] tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md">
+              Instagram
+            </span>
+            <a
+              href="https://www.instagram.com/shalagallery/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-text hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
+              title="Instagram @shalagallery"
+              aria-label="Instagram profile @shalagallery"
+            >
+              <InstagramIcon size={15} />
+            </a>
+          </div>
 
-        <button
-          onClick={handleOpenCommission}
-          className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-accent hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
-          title="Commission Inquiry"
-          aria-label="Commission Inquiry"
-        >
-          <Mail size={15} />
-        </button>
+          {/* Bespoke Commission Trigger */}
+          <div className="relative group flex items-center">
+            <span className="pointer-events-none absolute right-full mr-2.5 px-2 py-1 rounded bg-[#1F1E1B] text-[#FAF9F6] dark:bg-[#FAF9F6] dark:text-[#1F1E1B] text-[9px] tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md">
+              Commission
+            </span>
+            <button
+              onClick={handleOpenCommission}
+              className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-accent hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
+              title="Commission Artwork"
+              aria-label="Request custom artwork commission"
+            >
+              <Palette size={15} />
+            </button>
+          </div>
 
-        {showScrollTop && (
-          <button
-            onClick={scrollToTop}
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-text hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
-            title="Scroll to Top"
-            aria-label="Scroll to top"
-          >
-            <ArrowUp size={15} />
-          </button>
-        )}
-      </div>
+          {/* Scroll-to-Top Trigger */}
+          {showScrollTop && (
+            <div className="relative group flex items-center">
+              <span className="pointer-events-none absolute right-full mr-2.5 px-2 py-1 rounded bg-[#1F1E1B] text-[#FAF9F6] dark:bg-[#FAF9F6] dark:text-[#1F1E1B] text-[9px] tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md">
+                Top
+              </span>
+              <button
+                onClick={scrollToTop}
+                className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-theme-border bg-theme-bg-card text-theme-text hover:bg-theme-bg-surface transition-all duration-300 transform active:scale-95 cursor-pointer shadow-md hover:translate-y-[-2px] flex items-center justify-center"
+                title="Scroll to Top"
+                aria-label="Scroll to top"
+              >
+                <ArrowUp size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Lightbox Modal */}
       <ArtworkModal
         artwork={selectedArtwork}
+        artworkList={artworks}
         onClose={() => setSelectedArtwork(null)}
         onInquire={handleInquire}
         onSelectArtwork={setSelectedArtwork}
@@ -250,7 +309,9 @@ function AppContent() {
 export function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <ArtworksProvider>
+        <AppContent />
+      </ArtworksProvider>
     </ThemeProvider>
   );
 }

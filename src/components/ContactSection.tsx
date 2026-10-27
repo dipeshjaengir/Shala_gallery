@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Send, AlertCircle } from 'lucide-react';
+import { Mail, Send, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { InquiryFormData } from '../types/artwork';
 import { Magnetic } from './Magnetic';
 import { SectionHeader } from './SectionHeader';
@@ -48,6 +48,8 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submissionNotice, setSubmissionNotice] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -77,21 +79,72 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
       .join('\n');
   };
 
-  const handleMailtoSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-
+  const openMailClientFallback = () => {
     const subject = encodeURIComponent(
       `SHALAGALLERY Inquiry: ${formData.inquiryType}${formData.artworkTitle ? ` — ${formData.artworkTitle}` : ''}`
     );
     const body = encodeURIComponent(getEmailBody());
-    const mailtoUrl = `mailto:shalagallery@gmail.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:shalagallery@gmail.com?subject=${subject}&body=${body}`;
+  };
 
-    setSubmissionNotice(
-      'Your default email app is opening with this inquiry pre-filled to shalagallery@gmail.com.'
-    );
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
 
-    window.location.href = mailtoUrl;
+    setIsSubmitting(true);
+    setSubmissionNotice(null);
+
+    try {
+      const response = await fetch('/api/inquiries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          inquiryType: formData.inquiryType,
+          artworkTitle: formData.artworkTitle,
+          dimensions: formData.dimensions,
+          budgetRange: formData.budgetRange,
+          message: formData.message,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.status === 'ok') {
+        setIsSuccess(true);
+        setSubmissionNotice(
+          data.message || 'Your inquiry has been received. Asma will review your request personally.'
+        );
+        // Clear fields on successful submission
+        setFormData({
+          fullName: '',
+          email: '',
+          inquiryType: initialInquiryType,
+          artworkTitle: '',
+          dimensions: '',
+          budgetRange: '',
+          message: '',
+        });
+      } else {
+        // Fallback to opening default email application seamlessly
+        setIsSuccess(false);
+        const errMsg = data?.message || 'Connecting to your email application...';
+        setSubmissionNotice(`${errMsg} Opening your mail client to send directly to shalagallery@gmail.com.`);
+        openMailClientFallback();
+      }
+    } catch (err) {
+      console.warn('[Inquiry Submission Fallback]', err);
+      setIsSuccess(false);
+      setSubmissionNotice(
+        'Opening your default email app with this inquiry pre-filled to shalagallery@gmail.com.'
+      );
+      openMailClientFallback();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -165,7 +218,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
           <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-theme-accent" />
           <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-theme-accent" />
 
-          <form onSubmit={handleMailtoSubmit} className="flex flex-col gap-7 font-sans text-xs" noValidate>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-7 font-sans text-xs" noValidate>
             {/* Full Name & Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="flex flex-col gap-1.5 relative">
@@ -287,24 +340,55 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
               {errors.message && <p className="text-[10px] text-red-400 mt-1">{errors.message}</p>}
             </div>
 
-            {/* Notice if mailto clicked */}
+            {/* Submission notice */}
             {submissionNotice && (
-              <div className="p-3 bg-theme-bg-surface border border-theme-border text-xs text-theme-text flex items-start gap-2">
-                <AlertCircle size={14} className="text-theme-accent shrink-0 mt-0.5" />
-                <span className="opacity-90">{submissionNotice}</span>
+              <div
+                className={`p-4 border text-xs flex items-start gap-2.5 transition-all ${
+                  isSuccess
+                    ? 'bg-theme-bg-surface border-theme-accent/50 text-theme-text'
+                    : 'bg-theme-bg-surface border-theme-border text-theme-text'
+                }`}
+              >
+                {isSuccess ? (
+                  <CheckCircle2 size={15} className="text-theme-accent shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle size={15} className="text-theme-accent shrink-0 mt-0.5" />
+                )}
+                <span className="opacity-90 leading-relaxed font-sans">{submissionNotice}</span>
               </div>
             )}
 
             {/* Action Buttons */}
-            <div className="mt-2 flex flex-wrap gap-3">
+            <div className="mt-2 flex flex-wrap items-center gap-4">
               <Magnetic range={40} strength={0.2}>
                 <button
                   type="submit"
-                  className="bg-theme-text text-theme-bg border border-theme-text hover:bg-transparent hover:text-theme-text font-sans text-[10px] tracking-[0.3em] uppercase py-3.5 px-8 transition-all font-semibold flex items-center gap-2 cursor-pointer"
+                  disabled={isSubmitting}
+                  className="bg-theme-text text-theme-bg border border-theme-text hover:bg-transparent hover:text-theme-text font-sans text-[10px] tracking-[0.3em] uppercase py-3.5 px-8 transition-all font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  SEND INQUIRY <Send size={10} />
+                  {isSubmitting ? (
+                    <>
+                      TRANSMITTING <Loader2 size={12} className="animate-spin" />
+                    </>
+                  ) : isSuccess ? (
+                    <>
+                      INQUIRY SENT <CheckCircle2 size={12} className="text-theme-accent" />
+                    </>
+                  ) : (
+                    <>
+                      SEND INQUIRY <Send size={10} />
+                    </>
+                  )}
                 </button>
               </Magnetic>
+
+              <button
+                type="button"
+                onClick={openMailClientFallback}
+                className="text-[9px] tracking-[0.2em] uppercase text-theme-text-muted hover:text-theme-accent transition-colors underline underline-offset-4 font-sans cursor-pointer opacity-70 hover:opacity-100"
+              >
+                Open in Email App &rarr;
+              </button>
             </div>
           </form>
         </div>

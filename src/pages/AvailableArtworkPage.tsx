@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArtworkWithAsset, ARTWORKS_DATA } from '../data/artworks';
+import { useArtworks } from '../context/ArtworksContext';
 import { ArtworkCard } from '../components/ArtworkCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { SectionContainer } from '../components/SectionContainer';
@@ -7,6 +8,7 @@ import { Button } from '../components/Button';
 
 interface AvailableArtworkPageProps {
   initialCategory?: string;
+  artworks?: ArtworkWithAsset[];
   onSelectArtwork: (artwork: ArtworkWithAsset) => void;
   onRoomView: (artwork: ArtworkWithAsset) => void;
   onInquire: (artwork: ArtworkWithAsset) => void;
@@ -17,15 +19,25 @@ type PaintingFilter = 'All' | 'Available' | 'Commission' | 'Arabic Calligraphy';
 
 export const AvailableArtworkPage: React.FC<AvailableArtworkPageProps> = ({
   initialCategory,
+  artworks: propArtworks,
   onSelectArtwork,
   onRoomView,
   onInquire,
   onOpenCommission,
 }) => {
+  const { artworks: contextArtworks } = useArtworks();
+  const artworkList = propArtworks || contextArtworks || ARTWORKS_DATA;
+
   const [activeFilter, setActiveFilter] = useState<PaintingFilter>(() => {
     if (initialCategory === 'Arabic Calligraphy') return 'Arabic Calligraphy';
     return 'All';
   });
+
+  useEffect(() => {
+    if (initialCategory === 'Arabic Calligraphy') {
+      setActiveFilter('Arabic Calligraphy');
+    }
+  }, [initialCategory]);
 
   const filterTabs: PaintingFilter[] = [
     'All',
@@ -34,7 +46,7 @@ export const AvailableArtworkPage: React.FC<AvailableArtworkPageProps> = ({
     'Arabic Calligraphy',
   ];
 
-  const filteredArtworks = ARTWORKS_DATA.filter((artwork) => {
+  const filteredArtworks = artworkList.filter((artwork) => {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'Available') return artwork.status === 'available';
     if (activeFilter === 'Commission') return artwork.category === 'Previous Commissions' || artwork.status === 'commissioned';

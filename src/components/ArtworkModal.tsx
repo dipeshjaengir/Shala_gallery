@@ -2,9 +2,11 @@ import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
 import { ArtworkWithAsset, ARTWORKS_DATA } from '../data/artworks';
+import { useArtworks } from '../context/ArtworksContext';
 
 interface ArtworkModalProps {
   artwork: ArtworkWithAsset | null;
+  artworkList?: ArtworkWithAsset[];
   onClose: () => void;
   onInquire: (artwork: ArtworkWithAsset) => void;
   onSelectArtwork?: (artwork: ArtworkWithAsset) => void;
@@ -12,12 +14,16 @@ interface ArtworkModalProps {
 
 export const ArtworkModal: React.FC<ArtworkModalProps> = ({
   artwork,
+  artworkList: propArtworkList,
   onClose,
   onInquire,
   onSelectArtwork,
 }) => {
-  const artworkList = ARTWORKS_DATA;
-  const currentIndex = artwork ? artworkList.findIndex((a) => a.id === artwork.id) : -1;
+  const { artworks: contextArtworks } = useArtworks();
+  const artworkList = propArtworkList || (contextArtworks && contextArtworks.length > 0 ? contextArtworks : ARTWORKS_DATA);
+  const currentIndex = artwork
+    ? artworkList.findIndex((a) => (a.id && artwork.id && a.id === artwork.id) || a.title === artwork.title)
+    : -1;
 
   const handlePrev = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();

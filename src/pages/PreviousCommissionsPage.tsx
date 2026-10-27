@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { ArtworkWithAsset, ARTWORKS_DATA } from '../data/artworks';
+import { useArtworks } from '../context/ArtworksContext';
 import { ArtworkCard } from '../components/ArtworkCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { SectionContainer } from '../components/SectionContainer';
 import { Button } from '../components/Button';
 
 interface PreviousCommissionsPageProps {
+  artworks?: ArtworkWithAsset[];
   onSelectArtwork: (artwork: ArtworkWithAsset) => void;
   onRoomView: (artwork: ArtworkWithAsset) => void;
   onInquire: (artwork: ArtworkWithAsset) => void;
@@ -13,14 +15,17 @@ interface PreviousCommissionsPageProps {
 }
 
 export const PreviousCommissionsPage: React.FC<PreviousCommissionsPageProps> = ({
+  artworks: propArtworks,
   onSelectArtwork,
   onRoomView,
   onInquire,
   onOpenCommission,
 }) => {
+  const { artworks: contextArtworks } = useArtworks();
+  const artworkList = propArtworks || contextArtworks || ARTWORKS_DATA;
   const [activeFilter, setActiveFilter] = useState<'All' | 'Islamic-Inspired' | 'Landscapes & Nature'>('All');
 
-  const allCommissions = ARTWORKS_DATA.filter((a) => a.category === 'Previous Commissions');
+  const allCommissions = artworkList.filter((a) => a.category === 'Previous Commissions');
   const islamicCommissions = allCommissions.filter((a) => a.commissionSubtype === 'Islamic-Inspired');
   const landscapeCommissions = allCommissions.filter((a) => a.commissionSubtype === 'Landscapes & Nature');
 

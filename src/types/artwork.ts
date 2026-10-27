@@ -19,6 +19,7 @@ export interface Artwork {
   description?: string;
   aspectRatio: 'landscape' | 'portrait' | 'square' | 'tall';
   featured: boolean;
+  order?: number;
   commissionSubtype?: 'Islamic-Inspired' | 'Landscapes & Nature' | string;
   imagePlaceholderNote?: string;
   // Visual artwork presentation parameters

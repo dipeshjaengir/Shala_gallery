@@ -68,7 +68,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({
               <Frame className="p-3 md:p-4">
                 <div className="relative overflow-hidden w-full bg-white border border-theme-border">
                   <img
-                    src="/asma-portrait-landscape.jpg"
+                    src="https://res.cloudinary.com/ieyxmxrp/image/upload/v1793014211/shala_gallery/shala_gallery/artist-photo-portrait-landscape.jpg"
                     alt="Asma Shala"
                     className="w-full h-auto object-contain select-none block"
                     loading="eager"

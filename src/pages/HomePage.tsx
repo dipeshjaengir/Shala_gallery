@@ -2,22 +2,27 @@ import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { ArtworkWithAsset, ARTWORKS_DATA } from '../data/artworks';
+import { useArtworks } from '../context/ArtworksContext';
 import { ArtworkCard } from '../components/ArtworkCard';
 import { Button } from '../components/Button';
 import { Magnetic } from '../components/Magnetic';
 
 interface HomePageProps {
+  artworks?: ArtworkWithAsset[];
   onNavigate: (tab: string, categoryFilter?: string) => void;
   onSelectArtwork: (artwork: ArtworkWithAsset) => void;
   onInquire: (artwork: ArtworkWithAsset) => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
+  artworks: propArtworks,
   onNavigate,
   onSelectArtwork,
   onInquire,
 }) => {
-  const featuredArtworks = ARTWORKS_DATA.filter((a) => a.featured);
+  const { artworks: contextArtworks } = useArtworks();
+  const artworkList = propArtworks || contextArtworks || ARTWORKS_DATA;
+  const featuredArtworks = artworkList.filter((a) => a.featured);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -27,7 +32,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Full-bleed background image covering the entire viewport */}
         <div className="absolute inset-0 z-0">
           <img
-            src="/asma-calligraphy-hero.jpg"
+            src="https://res.cloudinary.com/ieyxmxrp/image/upload/v1793014209/shala_gallery/shala_gallery/artist-photo-calligraphy-hero.jpg"
             alt="Asma Shala creating Arabic calligraphy"
             className="w-full h-full object-cover object-[center_35%] sm:object-[center_30%]"
             loading="eager"
