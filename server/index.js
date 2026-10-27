@@ -11,14 +11,35 @@ import inquiriesRouter from './routes/inquiries.js';
 const { PORT } = getEnv();
 const app = express();
 
+const allowedOrigins = [
+  'https://shalagallery.vercel.app',
+  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()) : []),
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map((s) => s.trim()) : []),
+];
+
 // Security & Parsing Middleware
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow local development and same-origin
-      callback(null, true);
+      // Allow requests with no origin (mobile apps, curl, server-to-server, or Vercel proxy rewrites)
+      if (!origin) return callback(null, true);
+
+      // Check explicit allowed origins, Vercel deployments, and localhost
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        /^http:\/\/localhost:(5173|5174|3000|5000)$/.test(origin);
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+
+      console.warn(`[CORS Blocked] Origin: ${origin}`);
+      return callback(new Error(`CORS policy: origin ${origin} is not allowed.`));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 app.use(cookieParser());

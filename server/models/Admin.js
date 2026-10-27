@@ -49,11 +49,22 @@ const adminSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      transform: (doc, ret) => {
+        delete ret.passwordHash;
+        delete ret.setupTokenHash;
+        delete ret.resetTokenHash;
+        delete ret.failedLoginAttempts;
+        delete ret.lockUntil;
+        delete ret.__v;
+        return ret;
+      },
+    },
   }
 );
 
 adminSchema.methods.comparePassword = async function (candidatePassword) {
-  if (!this.passwordHash) return false;
+  if (!this.passwordHash || typeof candidatePassword !== 'string') return false;
   return bcrypt.compare(candidatePassword, this.passwordHash);
 };
 

@@ -16,6 +16,7 @@ import {
   Loader2,
   KeyRound,
 } from 'lucide-react';
+import { apiFetch, setStoredAdminToken } from '../utils/api';
 
 interface AdminPortalProps {
   onNavigate: (tab: string) => void;
@@ -119,7 +120,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
       try {
         // Check setup status
-        const setupRes = await fetch('/api/auth/setup-status').catch(() => null);
+        const setupRes = await apiFetch('/api/auth/setup-status').catch(() => null);
         if (setupRes && setupRes.ok) {
           const setupJson = await setupRes.json();
           setIsConfigured(setupJson.isConfigured);
@@ -128,7 +129,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
         }
 
         // Check current session
-        const meRes = await fetch('/api/auth/me').catch(() => null);
+        const meRes = await apiFetch('/api/auth/me').catch(() => null);
         if (meRes && meRes.ok) {
           const meJson = await meRes.json();
           if (meJson.authenticated) {
@@ -193,7 +194,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
   const fetchArtworks = async () => {
     try {
-      const res = await fetch('/api/artworks');
+      const res = await apiFetch('/api/artworks');
       if (res.ok) {
         const json = await res.json();
         setArtworks(json.data || []);
@@ -205,7 +206,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
   const fetchInquiries = async () => {
     try {
-      const res = await fetch('/api/inquiries');
+      const res = await apiFetch('/api/inquiries');
       if (res.ok) {
         const json = await res.json();
         setInquiries(json.data || []);
@@ -221,7 +222,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
     setStatusMessage(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
@@ -230,6 +231,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       const data = await res.json().catch(() => null);
 
       if (res.ok && data?.status === 'ok') {
+        if (data.token) {
+          setStoredAdminToken(data.token);
+        }
         setIsAuthenticated(true);
         setViewMode('dashboard');
         setStatusMessage(null);
@@ -250,7 +254,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
     } catch (e) {
       setStatusMessage({
         type: 'error',
-        text: 'Unable to reach backend server. Please verify port 5000 is running.',
+        text: 'Unable to reach backend server. Please verify the backend is active.',
       });
     } finally {
       setIsLoading(false);
@@ -272,7 +276,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
     setStatusMessage(null);
 
     try {
-      const res = await fetch('/api/auth/setup', {
+      const res = await apiFetch('/api/auth/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ setupToken: setupToken.trim(), password: setupPassword }),
@@ -281,6 +285,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       const data = await res.json().catch(() => null);
 
       if (res.ok && data?.status === 'ok') {
+        if (data.token) {
+          setStoredAdminToken(data.token);
+        }
         setIsAuthenticated(true);
         setIsConfigured(true);
         setViewMode('dashboard');
@@ -323,7 +330,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
     setStatusMessage(null);
 
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await apiFetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: resetToken.trim(), newPassword: resetPassword }),
@@ -332,6 +339,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       const data = await res.json().catch(() => null);
 
       if (res.ok && data?.status === 'ok') {
+        if (data.token) {
+          setStoredAdminToken(data.token);
+        }
         setIsAuthenticated(true);
         setIsConfigured(true);
         setViewMode('dashboard');
@@ -357,10 +367,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch (e) {
       console.warn('Logout network notice', e);
     }
+    setStoredAdminToken(null);
     setIsAuthenticated(false);
     setViewMode('login');
     setStatusMessage(null);
@@ -458,7 +469,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       const url = editingArtworkId ? `/api/artworks/${editingArtworkId}` : '/api/artworks';
       const method = editingArtworkId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         body: formData,
       });
@@ -485,7 +496,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
     }
 
     try {
-      const res = await fetch(`/api/artworks/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/artworks/${id}`, { method: 'DELETE' });
       if (res.ok) {
         fetchArtworks();
         window.dispatchEvent(new CustomEvent('shalagallery-artworks-updated'));
@@ -500,7 +511,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
   const handleUpdateInquiryStatus = async (id: string, newStatus: string) => {
     try {
-      const res = await fetch(`/api/inquiries/${id}`, {
+      const res = await apiFetch(`/api/inquiries/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -520,7 +531,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
     if (!window.confirm(`Delete inquiry submission from "${clientName}"?`)) return;
 
     try {
-      const res = await fetch(`/api/inquiries/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/inquiries/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setInquiries((prev) => prev.filter((inq) => inq._id !== id));
       }

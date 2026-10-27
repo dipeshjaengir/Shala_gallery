@@ -213,6 +213,10 @@ router.get('/', async (req, res) => {
 
 // GET /api/artworks/:id - Public: Retrieve single artwork
 router.get('/:id', async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid artwork identifier.' });
+  }
+
   try {
     const artwork = await Artwork.findById(req.params.id);
     if (!artwork) {
@@ -242,12 +246,17 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
       commissionSubtype,
     } = req.body;
 
-    if (!title || !title.trim()) {
+    if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({ status: 'error', message: 'Title is required.' });
     }
 
-    if (!category || !category.trim()) {
+    if (!category || typeof category !== 'string' || !category.trim()) {
       return res.status(400).json({ status: 'error', message: 'Category is required.' });
+    }
+
+    const validCategories = ['Landscape & Realism', 'Abstract Art', 'Arabic Calligraphy', 'Previous Commissions'];
+    if (!validCategories.includes(category.trim())) {
+      return res.status(400).json({ status: 'error', message: 'Invalid artwork category.' });
     }
 
     let imageSrc = req.body.imageSrc;
@@ -269,26 +278,29 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
 
     let orderNum = Number(req.body.order);
     if (isNaN(orderNum) || orderNum <= 0) {
-      const highest = await Artwork.findOne({ order: { $lt: 900 } }).sort({ order: -1 }).select('order');
-      orderNum = highest && typeof highest.order === 'number' ? highest.order + 1 : 23;
+      // Newly added artwork defaults to order 0 so it comes first
+      orderNum = 0;
     }
+
+    const validAspectRatios = ['landscape', 'portrait', 'square', 'tall'];
+    const validStatuses = ['available', 'sold', 'commissioned', 'private_collection'];
 
     const artwork = await Artwork.create({
       title: title.trim(),
       category: category.trim(),
-      medium: (medium || '').trim(),
-      dimensions: (dimensions || '').trim(),
-      price: price ? price.trim() : null,
-      framing: (framing || 'Unframed').trim(),
-      status: status || 'available',
-      year: year ? year.trim() : new Date().getFullYear().toString(),
-      description: (description || '').trim(),
-      aspectRatio: aspectRatio || 'portrait',
+      medium: (typeof medium === 'string' ? medium : '').trim(),
+      dimensions: (typeof dimensions === 'string' ? dimensions : '').trim(),
+      price: price && typeof price === 'string' ? price.trim() : null,
+      framing: (typeof framing === 'string' ? framing : 'Unframed').trim(),
+      status: validStatuses.includes(status) ? status : 'available',
+      year: year && typeof year === 'string' ? year.trim() : new Date().getFullYear().toString(),
+      description: (typeof description === 'string' ? description : '').trim(),
+      aspectRatio: validAspectRatios.includes(aspectRatio) ? aspectRatio : 'portrait',
       featured: featured === true || featured === 'true',
       order: orderNum,
       imageSrc,
       cloudinaryPublicId,
-      commissionSubtype: commissionSubtype ? commissionSubtype.trim() : null,
+      commissionSubtype: commissionSubtype && typeof commissionSubtype === 'string' ? commissionSubtype.trim() : null,
     });
 
     console.log(`[Artworks] Created artwork record: ${artwork.title} (ID: ${artwork._id})`);
@@ -306,39 +318,93 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
 
 // PUT /api/artworks/:id - Protected (Admin): Update artwork
 router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid artwork identifier.' });
+  }
+
   try {
     const artwork = await Artwork.findById(req.params.id);
     if (!artwork) {
       return res.status(404).json({ status: 'error', message: 'Artwork not found.' });
     }
 
-    const updates = { ...req.body };
+    const {
+      title,
+      category,
+      medium,
+      dimensions,
+      price,
+      framing,
+      status,
+      year,
+      description,
+      aspectRatio,
+      featured,
+      order,
+      commissionSubtype,
+    } = req.body;
+
+    const validCategories = ['Landscape & Realism', 'Abstract Art', 'Arabic Calligraphy', 'Previous Commissions'];
+    const validAspectRatios = ['landscape', 'portrait', 'square', 'tall'];
+    const validStatuses = ['available', 'sold', 'commissioned', 'private_collection'];
+
+    // Whitelisted updates
+    if (typeof title === 'string' && title.trim()) {
+      artwork.title = title.trim();
+    }
+    if (typeof category === 'string' && validCategories.includes(category.trim())) {
+      artwork.category = category.trim();
+    }
+    if (typeof medium === 'string') {
+      artwork.medium = medium.trim();
+    }
+    if (typeof dimensions === 'string') {
+      artwork.dimensions = dimensions.trim();
+    }
+    if (price !== undefined) {
+      artwork.price = typeof price === 'string' && price.trim() ? price.trim() : null;
+    }
+    if (typeof framing === 'string') {
+      artwork.framing = framing.trim();
+    }
+    if (typeof status === 'string' && validStatuses.includes(status)) {
+      artwork.status = status;
+    }
+    if (typeof year === 'string') {
+      artwork.year = year.trim();
+    }
+    if (typeof description === 'string') {
+      artwork.description = description.trim();
+    }
+    if (typeof aspectRatio === 'string' && validAspectRatios.includes(aspectRatio)) {
+      artwork.aspectRatio = aspectRatio;
+    }
+    if (featured !== undefined) {
+      artwork.featured = featured === true || featured === 'true';
+    }
+    if (order !== undefined) {
+      const parsedOrder = Number(order);
+      if (!isNaN(parsedOrder) && parsedOrder >= 0) {
+        artwork.order = parsedOrder;
+      }
+    }
+    if (commissionSubtype !== undefined) {
+      artwork.commissionSubtype = typeof commissionSubtype === 'string' && commissionSubtype.trim() ? commissionSubtype.trim() : null;
+    }
 
     // If new image file is uploaded, upload to Cloudinary and clean up previous Cloudinary asset
     if (req.file) {
       const uploadResult = await uploadArtworkStream(req.file.buffer, artwork.title);
       const oldPublicId = artwork.cloudinaryPublicId;
 
-      updates.imageSrc = uploadResult.secure_url;
-      updates.cloudinaryPublicId = uploadResult.public_id;
+      artwork.imageSrc = uploadResult.secure_url;
+      artwork.cloudinaryPublicId = uploadResult.public_id;
 
       if (oldPublicId) {
         await deleteArtworkAsset(oldPublicId);
       }
     }
 
-    if (updates.featured !== undefined) {
-      updates.featured = updates.featured === true || updates.featured === 'true';
-    }
-
-    if (updates.order !== undefined) {
-      const parsedOrder = Number(updates.order);
-      if (!isNaN(parsedOrder) && parsedOrder > 0) {
-        updates.order = parsedOrder;
-      }
-    }
-
-    Object.assign(artwork, updates);
     await artwork.save();
 
     console.log(`[Artworks] Updated artwork record: ${artwork.title}`);
@@ -356,6 +422,10 @@ router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
 
 // DELETE /api/artworks/:id - Protected (Admin): Delete artwork and associated Cloudinary asset
 router.delete('/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid artwork identifier.' });
+  }
+
   try {
     const artwork = await Artwork.findById(req.params.id);
     if (!artwork) {

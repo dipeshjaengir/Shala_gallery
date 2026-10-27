@@ -4,6 +4,7 @@ import { InquiryFormData } from '../types/artwork';
 import { Magnetic } from './Magnetic';
 import { SectionHeader } from './SectionHeader';
 import { SectionContainer } from './SectionContainer';
+import { apiFetch } from '../utils/api';
 
 // Inline Instagram SVG icon
 const InstagramIcon = ({ size = 16, className = '' }) => (
@@ -95,7 +96,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
     setSubmissionNotice(null);
 
     try {
-      const response = await fetch('/api/inquiries', {
+      const response = await apiFetch('/api/inquiries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

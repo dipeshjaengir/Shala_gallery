@@ -22,6 +22,27 @@ const getAdminDoc = async () => {
   return admin;
 };
 
+// Timing-safe comparison to prevent side-channel timing attacks
+function safeCompareHashes(hashA, hashB) {
+  if (!hashA || !hashB || typeof hashA !== 'string' || typeof hashB !== 'string') return false;
+  const bufA = Buffer.from(hashA, 'hex');
+  const bufB = Buffer.from(hashB, 'hex');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Cookie options helper for both same-origin and cross-origin environments
+const getSessionCookieOptions = (maxAgeMs = 7 * 24 * 60 * 60 * 1000) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    maxAge: maxAgeMs,
+    path: '/',
+  };
+};
+
 // GET /api/auth/setup-status
 router.get('/setup-status', async (req, res) => {
   try {
@@ -52,10 +73,10 @@ router.get('/setup-status', async (req, res) => {
 });
 
 // POST /api/auth/setup - One-time initial setup
-router.post('/setup', async (req, res) => {
+router.post('/setup', loginLimiter, async (req, res) => {
   const { setupToken, password } = req.body;
 
-  if (!setupToken || !password) {
+  if (!setupToken || !password || typeof setupToken !== 'string' || typeof password !== 'string') {
     return res.status(400).json({
       status: 'error',
       message: 'Setup token and password are required.',
@@ -93,16 +114,16 @@ router.post('/setup', async (req, res) => {
       });
     }
 
-    // Verify token hash
+    // Verify token hash timing-safely
     const inputHash = crypto.createHash('sha256').update(setupToken.trim()).digest('hex');
-    if (inputHash !== admin.setupTokenHash) {
+    if (!safeCompareHashes(inputHash, admin.setupTokenHash)) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid setup token.',
       });
     }
 
-    // Hash password and complete configuration
+    // Hash password with bcrypt (12 rounds)
     const salt = await bcrypt.genSalt(12);
     admin.passwordHash = await bcrypt.hash(password, salt);
     admin.isConfigured = true;
@@ -114,16 +135,12 @@ router.post('/setup', async (req, res) => {
 
     // Issue session token
     const token = signAdminToken(admin.email);
-    res.cookie('shala_admin_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('shala_admin_token', token, getSessionCookieOptions());
 
     res.json({
       status: 'ok',
       message: 'Administrator account configured successfully.',
+      token,
       email: admin.email,
     });
   } catch (error) {
@@ -136,7 +153,7 @@ router.post('/setup', async (req, res) => {
 router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
     return res.status(400).json({
       status: 'error',
       message: 'Email and password are required.',
@@ -194,16 +211,12 @@ router.post('/login', loginLimiter, async (req, res) => {
     await admin.save();
 
     const token = signAdminToken(admin.email);
-    res.cookie('shala_admin_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('shala_admin_token', token, getSessionCookieOptions());
 
     res.json({
       status: 'ok',
       message: 'Logged in successfully.',
+      token,
       email: admin.email,
     });
   } catch (error) {
@@ -214,10 +227,12 @@ router.post('/login', loginLimiter, async (req, res) => {
 
 // POST /api/auth/logout
 router.post('/logout', (req, res) => {
+  const isProd = process.env.NODE_ENV === 'production';
   res.clearCookie('shala_admin_token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    path: '/',
   });
   res.json({ status: 'ok', message: 'Logged out successfully.' });
 });
@@ -232,10 +247,10 @@ router.get('/me', requireAdmin, (req, res) => {
 });
 
 // GET /api/auth/verify-reset-token - Check if reset token is valid
-router.get('/verify-reset-token', async (req, res) => {
+router.get('/verify-reset-token', loginLimiter, async (req, res) => {
   const { token } = req.query;
 
-  if (!token) {
+  if (!token || typeof token !== 'string') {
     return res.status(400).json({
       status: 'error',
       valid: false,
@@ -245,9 +260,9 @@ router.get('/verify-reset-token', async (req, res) => {
 
   try {
     const admin = await getAdminDoc();
-    const tokenHash = crypto.createHash('sha256').update(String(token).trim()).digest('hex');
+    const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-    if (!admin.resetTokenHash || admin.resetTokenHash !== tokenHash) {
+    if (!admin.resetTokenHash || !safeCompareHashes(admin.resetTokenHash, tokenHash)) {
       return res.status(400).json({
         status: 'error',
         valid: false,
@@ -274,10 +289,10 @@ router.get('/verify-reset-token', async (req, res) => {
 });
 
 // POST /api/auth/reset-password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', loginLimiter, async (req, res) => {
   const { token, newPassword } = req.body;
 
-  if (!token || !newPassword) {
+  if (!token || !newPassword || typeof token !== 'string' || typeof newPassword !== 'string') {
     return res.status(400).json({
       status: 'error',
       message: 'Token and new password are required.',
@@ -295,7 +310,7 @@ router.post('/reset-password', async (req, res) => {
     const admin = await getAdminDoc();
     const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
 
-    if (!admin.resetTokenHash || admin.resetTokenHash !== tokenHash) {
+    if (!admin.resetTokenHash || !safeCompareHashes(admin.resetTokenHash, tokenHash)) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid or expired password reset token.',
@@ -318,18 +333,14 @@ router.post('/reset-password', async (req, res) => {
     admin.lockUntil = null;
     await admin.save();
 
-    // Issue session token so admin can immediately access dashboard or login
+    // Issue session token
     const sessionToken = signAdminToken(admin.email);
-    res.cookie('shala_admin_token', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('shala_admin_token', sessionToken, getSessionCookieOptions());
 
     res.json({
       status: 'ok',
       message: 'Password has been reset successfully. You are now logged in.',
+      token: sessionToken,
       email: admin.email,
     });
   } catch (error) {

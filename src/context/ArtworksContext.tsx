@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ArtworkWithAsset, ARTWORKS_DATA } from '../data/artworks';
+import { apiFetch } from '../utils/api';
 
 export interface ArtworksContextType {
   artworks: ArtworkWithAsset[];
@@ -170,7 +171,7 @@ export const ArtworksProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const fetchArtworks = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/artworks');
+      const res = await apiFetch('/api/artworks');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json && json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {

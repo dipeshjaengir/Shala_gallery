@@ -11,15 +11,15 @@ const router = Router();
 router.post('/', inquiryLimiter, async (req, res) => {
   const { fullName, email, inquiryType, artworkTitle, dimensions, budgetRange, message } = req.body;
 
-  if (!fullName || !fullName.trim()) {
+  if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
     return res.status(400).json({ status: 'error', message: 'Full name is required.' });
   }
 
-  if (!email || !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+  if (!email || typeof email !== 'string' || !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     return res.status(400).json({ status: 'error', message: 'A valid email address is required.' });
   }
 
-  if (!message || !message.trim()) {
+  if (!message || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ status: 'error', message: 'Message details are required.' });
   }
 
@@ -43,16 +43,17 @@ router.post('/', inquiryLimiter, async (req, res) => {
     const inquiry = await Inquiry.create({
       fullName: fullName.trim(),
       email: email.trim().toLowerCase(),
-      inquiryType: inquiryType || 'Custom Commission',
-      artworkTitle: (artworkTitle || '').trim(),
-      dimensions: (dimensions || '').trim(),
-      budgetRange: (budgetRange || '').trim(),
+      inquiryType: typeof inquiryType === 'string' && inquiryType.trim() ? inquiryType.trim() : 'Custom Commission',
+      artworkTitle: typeof artworkTitle === 'string' ? artworkTitle.trim() : '',
+      dimensions: typeof dimensions === 'string' ? dimensions.trim() : '',
+      budgetRange: typeof budgetRange === 'string' ? budgetRange.trim() : '',
       message: message.trim(),
       status: 'unread',
       ipHash,
     });
 
-    console.log(`[Inquiries] New genuine inquiry received from ${inquiry.fullName} (${inquiry.inquiryType})`);
+    // Privacy-safe log: Mask customer personal data from server logs
+    console.log(`[Inquiries] New genuine inquiry received (ID: ${inquiry._id}, type: ${inquiry.inquiryType})`);
 
     res.status(201).json({
       status: 'ok',
@@ -91,10 +92,14 @@ router.get('/', requireAdmin, async (req, res) => {
 
 // PATCH /api/inquiries/:id - Protected Admin Status Update
 router.patch('/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid inquiry identifier.' });
+  }
+
   const { status } = req.body;
   const allowedStatuses = ['unread', 'read', 'responded', 'archived'];
 
-  if (!allowedStatuses.includes(status)) {
+  if (!status || typeof status !== 'string' || !allowedStatuses.includes(status)) {
     return res.status(400).json({ status: 'error', message: 'Invalid status value.' });
   }
 
@@ -111,6 +116,10 @@ router.patch('/:id', requireAdmin, async (req, res) => {
 
 // DELETE /api/inquiries/:id - Protected Admin Delete
 router.delete('/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid inquiry identifier.' });
+  }
+
   try {
     const deleted = await Inquiry.findByIdAndDelete(req.params.id);
     if (!deleted) {
