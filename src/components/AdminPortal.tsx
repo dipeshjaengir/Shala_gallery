@@ -248,6 +248,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     setStatusMessage(null);
 
@@ -296,6 +297,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     if (setupPassword !== setupConfirmPassword) {
       setStatusMessage({ type: 'error', text: 'Passwords do not match.' });
       return;
@@ -349,6 +351,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     if (resetPassword !== resetConfirmPassword) {
       setStatusMessage({ type: 'error', text: 'Passwords do not match.' });
       return;

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { Admin } from '../models/Admin.js';
 import { requireAdmin, signAdminToken } from '../middleware/auth.js';
-import { loginLimiter } from '../middleware/rateLimiter.js';
+import { loginLimiter, loginIpGuard, resetLoginRateLimit } from '../middleware/rateLimiter.js';
 import { getEnv, isAuthorizedAdminEmail } from '../config/env.js';
 
 const router = Router();
@@ -129,6 +129,8 @@ router.post('/setup', loginLimiter, async (req, res) => {
     admin.lockUntil = null;
     await admin.save();
 
+    await resetLoginRateLimit(req, admin.email);
+
     console.log(`[Auth] Administrator configured successfully for ${admin.email}`);
 
     // Issue session token
@@ -148,7 +150,7 @@ router.post('/setup', loginLimiter, async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginIpGuard, loginLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
@@ -252,7 +254,7 @@ router.get('/me', requireAdmin, (req, res) => {
 });
 
 // POST /api/auth/change-password - Protected: Authenticated administrator changes their own password
-router.post('/change-password', requireAdmin, loginLimiter, async (req, res) => {
+router.post('/change-password', requireAdmin, async (req, res) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
 
   if (
@@ -319,6 +321,8 @@ router.post('/change-password', requireAdmin, loginLimiter, async (req, res) => 
     admin.lockUntil = null;
     await admin.save();
 
+    await resetLoginRateLimit(req, admin.email);
+
     console.log(`[Auth] Password changed successfully for ${admin.email}`);
 
     // Re-issue session token
@@ -338,7 +342,7 @@ router.post('/change-password', requireAdmin, loginLimiter, async (req, res) => 
 });
 
 // GET /api/auth/verify-reset-token - Check if reset token is valid
-router.get('/verify-reset-token', loginLimiter, async (req, res) => {
+router.get('/verify-reset-token', async (req, res) => {
   const { token } = req.query;
 
   if (!token || typeof token !== 'string') {
@@ -423,6 +427,8 @@ router.post('/reset-password', loginLimiter, async (req, res) => {
     admin.failedLoginAttempts = 0;
     admin.lockUntil = null;
     await admin.save();
+
+    await resetLoginRateLimit(req, admin.email);
 
     // Issue session token
     const sessionToken = signAdminToken(admin.email);

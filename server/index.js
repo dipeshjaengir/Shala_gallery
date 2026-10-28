@@ -11,6 +11,11 @@ import inquiriesRouter from './routes/inquiries.js';
 const { PORT } = getEnv();
 const app = express();
 
+// Configure Express proxy trust for Render reverse proxy environment (1 hop).
+// Trusts the single immediate reverse proxy hop, securely extracting the upstream client IP
+// from X-Forwarded-For without trusting arbitrary client-spoofed headers.
+app.set('trust proxy', 1);
+
 const allowedOrigins = [
   'https://shalagallery.vercel.app',
   ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()) : []),
