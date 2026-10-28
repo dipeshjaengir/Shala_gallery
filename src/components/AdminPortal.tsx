@@ -115,6 +115,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       const params = new URLSearchParams(window.location.search);
       const tokenParam = params.get('token');
       const actionParam = params.get('action');
+      const emailParam = params.get('email');
+
+      if (emailParam) {
+        setAdminEmail(emailParam);
+        setLoginEmail(emailParam);
+      }
 
       let currentConfigured = true;
 
@@ -125,7 +131,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
           const setupJson = await setupRes.json();
           setIsConfigured(setupJson.isConfigured);
           currentConfigured = setupJson.isConfigured;
-          if (setupJson.adminEmail) setAdminEmail(setupJson.adminEmail);
+          if (setupJson.adminEmail && !emailParam) setAdminEmail(setupJson.adminEmail);
+          if (setupJson.adminEmail && !emailParam) setLoginEmail(setupJson.adminEmail);
+        }
+
+        // If a token was provided, verify it to retrieve the specific target administrator account
+        if (tokenParam) {
+          const verifyRes = await apiFetch(
+            `/api/auth/verify-reset-token?token=${encodeURIComponent(tokenParam)}`
+          ).catch(() => null);
+          if (verifyRes && verifyRes.ok) {
+            const verifyJson = await verifyRes.json();
+            if (verifyJson.valid && verifyJson.email) {
+              setAdminEmail(verifyJson.email);
+              setLoginEmail(verifyJson.email);
+            }
+          }
         }
 
         // Check current session
@@ -133,6 +154,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
         if (meRes && meRes.ok) {
           const meJson = await meRes.json();
           if (meJson.authenticated) {
+            if (meJson.email) setAdminEmail(meJson.email);
             setIsAuthenticated(true);
             setViewMode('dashboard');
             return;
@@ -234,6 +256,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
         if (data.token) {
           setStoredAdminToken(data.token);
         }
+        if (data.email) {
+          setAdminEmail(data.email);
+        }
         setIsAuthenticated(true);
         setViewMode('dashboard');
         setStatusMessage(null);
@@ -287,6 +312,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       if (res.ok && data?.status === 'ok') {
         if (data.token) {
           setStoredAdminToken(data.token);
+        }
+        if (data.email) {
+          setAdminEmail(data.email);
         }
         setIsAuthenticated(true);
         setIsConfigured(true);
@@ -342,6 +370,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
         if (data.token) {
           setStoredAdminToken(data.token);
         }
+        if (data.email) {
+          setAdminEmail(data.email);
+        }
         setIsAuthenticated(true);
         setIsConfigured(true);
         setViewMode('dashboard');
@@ -372,6 +403,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       console.warn('Logout network notice', e);
     }
     setStoredAdminToken(null);
+    setLoginPassword('');
     setIsAuthenticated(false);
     setViewMode('login');
     setStatusMessage(null);

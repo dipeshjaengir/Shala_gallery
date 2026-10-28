@@ -5,17 +5,18 @@ import mongoose from 'mongoose';
 import { Admin } from '../models/Admin.js';
 import { requireAdmin, signAdminToken } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimiter.js';
-import { getEnv } from '../config/env.js';
+import { getEnv, isAuthorizedAdminEmail } from '../config/env.js';
 
 const router = Router();
 const { ADMIN_EMAIL } = getEnv();
 
-// Helper to get or initialize the admin document in MongoDB
-const getAdminDoc = async () => {
-  let admin = await Admin.findOne({ email: ADMIN_EMAIL });
+// Helper to get or initialize an admin document in MongoDB
+const getAdminDoc = async (email = ADMIN_EMAIL) => {
+  const normalized = (email || ADMIN_EMAIL).trim().toLowerCase();
+  let admin = await Admin.findOne({ email: normalized });
   if (!admin) {
     admin = await Admin.create({
-      email: ADMIN_EMAIL,
+      email: normalized,
       isConfigured: false,
     });
   }
@@ -54,10 +55,13 @@ router.get('/setup-status', async (req, res) => {
         databaseConnected: false,
       });
     }
-    const admin = await getAdminDoc();
+    const configuredCount = await Admin.countDocuments({
+      isConfigured: true,
+      passwordHash: { $ne: null },
+    });
     res.json({
       status: 'ok',
-      isConfigured: admin.isConfigured,
+      isConfigured: configuredCount > 0,
       adminEmail: ADMIN_EMAIL,
       databaseConnected: true,
     });
@@ -91,35 +95,27 @@ router.post('/setup', loginLimiter, async (req, res) => {
   }
 
   try {
-    const admin = await getAdminDoc();
+    const inputHash = crypto.createHash('sha256').update(setupToken.trim()).digest('hex');
+    const admin = await Admin.findOne({ setupTokenHash: inputHash });
 
-    if (admin.isConfigured) {
+    if (!admin || !safeCompareHashes(inputHash, admin.setupTokenHash)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid setup token.',
+      });
+    }
+
+    if (admin.isConfigured && admin.passwordHash) {
       return res.status(403).json({
         status: 'error',
         message: 'Initial admin setup has already been completed. Use the login page instead.',
       });
     }
 
-    if (!admin.setupTokenHash) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'No setup token has been generated. Run `node server/scripts/init-admin.js` on the server to generate a secure setup token.',
-      });
-    }
-
     if (admin.setupTokenExpires && admin.setupTokenExpires < new Date()) {
       return res.status(400).json({
         status: 'error',
-        message: 'Setup token has expired. Please generate a new one via `node server/scripts/init-admin.js`.',
-      });
-    }
-
-    // Verify token hash timing-safely
-    const inputHash = crypto.createHash('sha256').update(setupToken.trim()).digest('hex');
-    if (!safeCompareHashes(inputHash, admin.setupTokenHash)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid setup token.',
+        message: 'Setup token has expired. Please generate a new one via the server CLI.',
       });
     }
 
@@ -129,9 +125,11 @@ router.post('/setup', loginLimiter, async (req, res) => {
     admin.isConfigured = true;
     admin.setupTokenHash = null;
     admin.setupTokenExpires = null;
+    admin.failedLoginAttempts = 0;
+    admin.lockUntil = null;
     await admin.save();
 
-    console.log(`[Auth] Initial administrator configured successfully for ${ADMIN_EMAIL}`);
+    console.log(`[Auth] Administrator configured successfully for ${admin.email}`);
 
     // Issue session token
     const token = signAdminToken(admin.email);
@@ -162,7 +160,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  if (normalizedEmail !== ADMIN_EMAIL) {
+  if (!isAuthorizedAdminEmail(normalizedEmail)) {
     return res.status(401).json({
       status: 'error',
       message: 'Invalid email or password.',
@@ -170,7 +168,14 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 
   try {
-    const admin = await getAdminDoc();
+    const admin = await Admin.findOne({ email: normalizedEmail });
+
+    if (!admin) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password.',
+      });
+    }
 
     if (!admin.isConfigured || !admin.passwordHash) {
       return res.status(403).json({
@@ -191,10 +196,10 @@ router.post('/login', loginLimiter, async (req, res) => {
     const isValid = await admin.comparePassword(password);
 
     if (!isValid) {
-      admin.failedLoginAttempts += 1;
+      admin.failedLoginAttempts = (admin.failedLoginAttempts || 0) + 1;
       if (admin.failedLoginAttempts >= 5) {
         admin.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
-        console.warn(`[Auth] Account locked due to 5 failed attempts: ${ADMIN_EMAIL}`);
+        console.warn(`[Auth] Account locked due to 5 failed attempts: ${admin.email}`);
       }
       await admin.save();
 
@@ -259,10 +264,10 @@ router.get('/verify-reset-token', loginLimiter, async (req, res) => {
   }
 
   try {
-    const admin = await getAdminDoc();
     const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+    const admin = await Admin.findOne({ resetTokenHash: tokenHash });
 
-    if (!admin.resetTokenHash || !safeCompareHashes(admin.resetTokenHash, tokenHash)) {
+    if (!admin || !safeCompareHashes(admin.resetTokenHash, tokenHash)) {
       return res.status(400).json({
         status: 'error',
         valid: false,
@@ -307,10 +312,10 @@ router.post('/reset-password', loginLimiter, async (req, res) => {
   }
 
   try {
-    const admin = await getAdminDoc();
     const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
+    const admin = await Admin.findOne({ resetTokenHash: tokenHash });
 
-    if (!admin.resetTokenHash || !safeCompareHashes(admin.resetTokenHash, tokenHash)) {
+    if (!admin || !safeCompareHashes(admin.resetTokenHash, tokenHash)) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid or expired password reset token.',
@@ -337,9 +342,11 @@ router.post('/reset-password', loginLimiter, async (req, res) => {
     const sessionToken = signAdminToken(admin.email);
     res.cookie('shala_admin_token', sessionToken, getSessionCookieOptions());
 
+    console.log(`[Auth] Password configured successfully for ${admin.email}`);
+
     res.json({
       status: 'ok',
-      message: 'Password has been reset successfully. You are now logged in.',
+      message: 'Password has been set successfully. You are now logged in.',
       token: sessionToken,
       email: admin.email,
     });

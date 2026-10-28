@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { Admin } from '../models/Admin.js';
 import { DB_NAME } from '../config/db.js';
-import { getEnv, validateMongoUri } from '../config/env.js';
+import { getEnv, validateMongoUri, isAuthorizedAdminEmail } from '../config/env.js';
 
 const run = async () => {
   const { MONGODB_URI, ADMIN_EMAIL } = getEnv();
@@ -14,13 +14,43 @@ const run = async () => {
     process.exit(1);
   }
 
+  // Parse email argument (--email=... or --email ...)
+  let targetEmail = ADMIN_EMAIL;
+  const emailArgIndex = process.argv.findIndex((arg) => arg.startsWith('--email=') || arg === '--email');
+  if (emailArgIndex !== -1) {
+    const arg = process.argv[emailArgIndex];
+    if (arg.startsWith('--email=')) {
+      targetEmail = arg.split('=')[1].trim().toLowerCase();
+    } else if (process.argv[emailArgIndex + 1]) {
+      targetEmail = process.argv[emailArgIndex + 1].trim().toLowerCase();
+    }
+  }
+
+  // Parse token expiration hours (--hours=..., default 48 hours for client setup)
+  let expirationHours = 48;
+  const hoursArgIndex = process.argv.findIndex((arg) => arg.startsWith('--hours=') || arg === '--hours');
+  if (hoursArgIndex !== -1) {
+    const arg = process.argv[hoursArgIndex];
+    const val = arg.startsWith('--hours=') ? arg.split('=')[1] : process.argv[hoursArgIndex + 1];
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      expirationHours = parsed;
+    }
+  }
+
+  if (!isAuthorizedAdminEmail(targetEmail)) {
+    console.warn(`[Notice] ${targetEmail} is being added as an administrator.`);
+  }
+
   try {
     await mongoose.connect(MONGODB_URI, { dbName: DB_NAME, serverSelectionTimeoutMS: 8000 });
     console.log(`Connected to database '${DB_NAME}'.`);
 
-    let admin = await Admin.findOne({ email: ADMIN_EMAIL });
+    let admin = await Admin.findOne({ email: targetEmail });
+    const isNewAccount = !admin;
     if (!admin) {
-      admin = new Admin({ email: ADMIN_EMAIL, isConfigured: false });
+      admin = new Admin({ email: targetEmail, isConfigured: false });
+      console.log(`Provisioning new administrator account record for: ${targetEmail}`);
     }
 
     // Check if direct password argument was provided
@@ -46,54 +76,47 @@ const run = async () => {
       await admin.save();
 
       console.log('===============================================================');
-      console.log(`Administrator password set successfully for ${ADMIN_EMAIL}.`);
-      console.log('You can now log in at: http://localhost:5173/?tab=admin');
+      console.log(`Administrator password set successfully for ${targetEmail}.`);
+      console.log('Production Portal: https://shalagallery.vercel.app/admin');
       console.log('===============================================================');
-    } else if (admin.isConfigured && !isResetRequested) {
+    } else if (admin.isConfigured && !isResetRequested && !isNewAccount) {
       console.log('===============================================================');
-      console.log(`ADMIN STATUS: Administrator account is ALREADY configured for ${ADMIN_EMAIL}.`);
-      console.log('Login portal: http://localhost:5173/?tab=admin');
+      console.log(`ADMIN STATUS: Administrator account is ALREADY configured for ${targetEmail}.`);
+      console.log('Login portal: https://shalagallery.vercel.app/admin');
       console.log('---------------------------------------------------------------');
       console.log('To generate a secure single-use password reset link, run:');
-      console.log('  node server/scripts/init-admin.js --reset');
-      console.log('Or to update your password directly from the server CLI, run:');
-      console.log('  node server/scripts/init-admin.js --password=YourNewPassword');
+      console.log(`  node server/scripts/init-admin.js --email=${targetEmail} --reset`);
+      console.log('Or to update the password directly from the server CLI, run:');
+      console.log(`  node server/scripts/init-admin.js --email=${targetEmail} --password=YourNewPassword`);
       console.log('===============================================================');
     } else {
-      // Generate secure setup or reset token
+      // Generate secure setup / reset token
       const rawToken = crypto.randomBytes(24).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-      if (isResetRequested) {
-        admin.resetTokenHash = tokenHash;
-        admin.resetTokenExpires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
-        await admin.save();
+      const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000);
 
-        console.log('===============================================================');
-        console.log('SHALAGALLERY SECURE PASSWORD RESET TOKEN');
-        console.log('===============================================================');
-        console.log(`Admin Email: ${ADMIN_EMAIL}`);
-        console.log(`Reset Token: ${rawToken}`);
-        console.log(`Reset Link:  http://localhost:5173/?tab=admin&action=reset&token=${rawToken}`);
-        console.log('Valid for:   2 hours (single-use)');
-        console.log('===============================================================');
-      } else {
-        admin.setupTokenHash = tokenHash;
-        admin.setupTokenExpires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
-        await admin.save();
+      // We assign both resetTokenHash and setupTokenHash for universal compatibility
+      admin.resetTokenHash = tokenHash;
+      admin.resetTokenExpires = expiresAt;
+      admin.setupTokenHash = tokenHash;
+      admin.setupTokenExpires = expiresAt;
+      await admin.save();
 
-        console.log('===============================================================');
-        console.log('SHALAGALLERY SECURE ADMINISTRATOR INITIALIZATION');
-        console.log('===============================================================');
-        console.log(`Admin Email: ${ADMIN_EMAIL}`);
-        console.log(`Setup Token: ${rawToken}`);
-        console.log(`Setup Link:  http://localhost:5173/?tab=admin&action=setup&token=${rawToken}`);
-        console.log('Valid for:   2 hours (single-use)');
-        console.log('---------------------------------------------------------------');
-        console.log('Open the setup link in your browser to configure your password,');
-        console.log('or run: node server/scripts/init-admin.js --password=YourChosenPassword');
-        console.log('===============================================================');
-      }
+      const prodLink = `https://shalagallery.vercel.app/admin?action=reset&token=${rawToken}&email=${encodeURIComponent(targetEmail)}`;
+      const localLink = `http://localhost:5173/admin?action=reset&token=${rawToken}&email=${encodeURIComponent(targetEmail)}`;
+
+      console.log('===============================================================');
+      console.log(`SHALAGALLERY SECURE PASSWORD SETUP / RESET TOKEN`);
+      console.log('===============================================================');
+      console.log(`Admin Account:   ${targetEmail}`);
+      console.log(`Account Status:  ${isNewAccount ? 'Newly Provisioned' : 'Existing Account (Reset Requested)'}`);
+      console.log(`Token Validity:  ${expirationHours} hour(s) (single-use, auto-expires on completion)`);
+      console.log(`Setup Token:     ${rawToken}`);
+      console.log('---------------------------------------------------------------');
+      console.log(`PRODUCTION URL:  ${prodLink}`);
+      console.log(`LOCAL URL:       ${localLink}`);
+      console.log('===============================================================');
     }
 
     await mongoose.disconnect();

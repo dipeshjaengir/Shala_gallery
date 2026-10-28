@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { getEnv, isAuthorizedAdminEmail } from '../config/env.js';
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'shala_gallery_jwt_secure_session_token_key_987654321';
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'dipeshjangir12@gmail.com').toLowerCase();
+const { JWT_SECRET } = getEnv();
 
 export const requireAdmin = (req, res, next) => {
   // Check cookie first (HTTP-only), then Authorization header
@@ -24,7 +24,7 @@ export const requireAdmin = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    if (!decoded || decoded.email !== ADMIN_EMAIL) {
+    if (!decoded || !decoded.email || !isAuthorizedAdminEmail(decoded.email)) {
       return res.status(403).json({
         status: 'error',
         message: 'Access denied. You do not have administrator permissions.',

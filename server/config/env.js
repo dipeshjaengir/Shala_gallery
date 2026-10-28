@@ -22,8 +22,24 @@ export const getEnv = () => ({
   CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER || 'shala_gallery',
   CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET || 'shala_gallery',
   ADMIN_EMAIL: (process.env.ADMIN_EMAIL || 'dipeshjangir12@gmail.com').toLowerCase(),
+  ADMIN_EMAILS: Array.from(
+    new Set([
+      (process.env.ADMIN_EMAIL || 'dipeshjangir12@gmail.com').trim().toLowerCase(),
+      'shalagallery@gmail.com',
+      ...(process.env.ADDITIONAL_ADMIN_EMAILS
+        ? process.env.ADDITIONAL_ADMIN_EMAILS.split(',').map((e) => e.trim().toLowerCase())
+        : []),
+    ])
+  ),
   JWT_SECRET: process.env.JWT_SECRET || 'shala_gallery_jwt_secure_session_token_key_987654321',
 });
+
+export const isAuthorizedAdminEmail = (email) => {
+  if (!email || typeof email !== 'string') return false;
+  const normalized = email.trim().toLowerCase();
+  const { ADMIN_EMAILS } = getEnv();
+  return ADMIN_EMAILS.includes(normalized);
+};
 
 export const validateMongoUri = (uri) => {
   if (!uri || !uri.trim()) {
