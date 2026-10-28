@@ -15,6 +15,7 @@ import {
   X,
   Loader2,
   KeyRound,
+  CheckCircle2,
 } from 'lucide-react';
 import { apiFetch, setStoredAdminToken } from '../utils/api';
 
@@ -58,7 +59,7 @@ interface CustomerInquiry {
 export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
   // Authentication & State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [adminEmail, setAdminEmail] = useState<string>('dipeshjangir12@gmail.com');
+  const [adminEmail, setAdminEmail] = useState<string>('');
   const [isConfigured, setIsConfigured] = useState<boolean>(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
 
@@ -66,8 +67,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
   const [viewMode, setViewMode] = useState<'login' | 'setup' | 'reset' | 'dashboard'>('login');
   const [activeTab, setActiveTab] = useState<'artworks' | 'inquiries'>('artworks');
 
-  // Form states
-  const [loginEmail, setLoginEmail] = useState<string>('dipeshjangir12@gmail.com');
+  // Form states - completely empty by default for fresh unauthenticated sessions
+  const [loginEmail, setLoginEmail] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [setupToken, setSetupToken] = useState<string>('');
   const [setupPassword, setSetupPassword] = useState<string>('');
@@ -75,6 +76,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
   const [resetToken, setResetToken] = useState<string>('');
   const [resetPassword, setResetPassword] = useState<string>('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState<string>('');
+
+  // Change Password state (for authenticated admin panel)
+  const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState<string>('');
+  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
+  const [confirmNewPasswordInput, setConfirmNewPasswordInput] = useState<string>('');
+  const [changePasswordStatus, setChangePasswordStatus] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState<boolean>(false);
 
   // Status and notices
   const [statusMessage, setStatusMessage] = useState<{ type: 'error' | 'success' | 'info'; text: string } | null>(null);
@@ -119,7 +128,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
 
       if (emailParam) {
         setAdminEmail(emailParam);
-        setLoginEmail(emailParam);
       }
 
       let currentConfigured = true;
@@ -131,8 +139,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
           const setupJson = await setupRes.json();
           setIsConfigured(setupJson.isConfigured);
           currentConfigured = setupJson.isConfigured;
-          if (setupJson.adminEmail && !emailParam) setAdminEmail(setupJson.adminEmail);
-          if (setupJson.adminEmail && !emailParam) setLoginEmail(setupJson.adminEmail);
+          if (setupJson.adminEmail && !adminEmail) {
+            setAdminEmail(setupJson.adminEmail);
+          }
         }
 
         // If a token was provided, verify it to retrieve the specific target administrator account
@@ -144,7 +153,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
             const verifyJson = await verifyRes.json();
             if (verifyJson.valid && verifyJson.email) {
               setAdminEmail(verifyJson.email);
-              setLoginEmail(verifyJson.email);
             }
           }
         }
@@ -403,10 +411,73 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
       console.warn('Logout network notice', e);
     }
     setStoredAdminToken(null);
+    setLoginEmail('');
     setLoginPassword('');
     setIsAuthenticated(false);
     setViewMode('login');
     setStatusMessage(null);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPasswordInput !== confirmNewPasswordInput) {
+      setChangePasswordStatus({ type: 'error', text: 'New password and confirmation do not match.' });
+      return;
+    }
+    if (newPasswordInput.length < 8) {
+      setChangePasswordStatus({ type: 'error', text: 'New password must be at least 8 characters long.' });
+      return;
+    }
+    if (currentPasswordInput === newPasswordInput) {
+      setChangePasswordStatus({ type: 'error', text: 'New password must be different from current password.' });
+      return;
+    }
+
+    setIsSubmittingPassword(true);
+    setChangePasswordStatus(null);
+
+    try {
+      const res = await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: currentPasswordInput,
+          newPassword: newPasswordInput,
+          confirmPassword: confirmNewPasswordInput,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.status === 'ok') {
+        if (data.token) {
+          setStoredAdminToken(data.token);
+        }
+        setChangePasswordStatus({
+          type: 'success',
+          text: data?.message || 'Password changed successfully.',
+        });
+        setCurrentPasswordInput('');
+        setNewPasswordInput('');
+        setConfirmNewPasswordInput('');
+        setTimeout(() => {
+          setIsChangingPassword(false);
+          setChangePasswordStatus(null);
+        }, 1800);
+      } else {
+        setChangePasswordStatus({
+          type: 'error',
+          text: data?.message || 'Failed to update password. Please check your current password.',
+        });
+      }
+    } catch (err) {
+      setChangePasswordStatus({
+        type: 'error',
+        text: 'Unable to reach backend server. Please check your connection.',
+      });
+    } finally {
+      setIsSubmittingPassword(false);
+    }
   };
 
   const handleOpenNewArtwork = () => {
@@ -882,7 +953,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-6 text-xs">
+          <form onSubmit={handleLogin} autoComplete="off" className="flex flex-col gap-6 text-xs">
             <div className="flex flex-col gap-1.5">
               <label className="text-[9px] tracking-[0.2em] text-theme-text-muted uppercase font-semibold">
                 Admin Email
@@ -890,6 +961,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
               <input
                 type="email"
                 required
+                autoComplete="off"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
                 className="py-2.5 bg-transparent border-b border-theme-border-medium focus:border-theme-accent outline-none text-theme-text font-medium"
@@ -903,9 +975,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
               <input
                 type="password"
                 required
+                autoComplete="new-password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="••••••••••••"
                 className="py-2.5 bg-transparent border-b border-theme-border-medium focus:border-theme-accent outline-none text-theme-text"
               />
             </div>
@@ -955,16 +1027,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
           <h1 className="font-serif text-2xl sm:text-3xl text-theme-text">Gallery Administration</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => {
+              setCurrentPasswordInput('');
+              setNewPasswordInput('');
+              setConfirmNewPasswordInput('');
+              setChangePasswordStatus(null);
+              setIsChangingPassword(true);
+            }}
+            className="px-3.5 py-2 bg-theme-bg-card border border-theme-border text-[9px] tracking-[0.2em] uppercase text-theme-text-muted hover:text-theme-text hover:border-theme-text transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <KeyRound size={12} /> Change Password
+          </button>
           <button
             onClick={() => onNavigate('home')}
-            className="px-4 py-2 border border-theme-border text-[9px] tracking-[0.2em] uppercase text-theme-text-muted hover:text-theme-text hover:border-theme-text transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 border border-theme-border text-[9px] tracking-[0.2em] uppercase text-theme-text-muted hover:text-theme-text hover:border-theme-text transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft size={12} /> Public Site
           </button>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 bg-theme-bg-card border border-theme-border text-[9px] tracking-[0.2em] uppercase text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 bg-theme-bg-card border border-theme-border text-[9px] tracking-[0.2em] uppercase text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <LogOut size={12} /> Logout
           </button>
@@ -1489,6 +1573,133 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onNavigate }) => {
                 {isLoading ? <Loader2 size={12} className="animate-spin" /> : 'Save Record'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --------------------------------------------------------- */}
+      {/* MODAL: CHANGE PASSWORD */}
+      {/* --------------------------------------------------------- */}
+      {isChangingPassword && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-theme-bg-card border border-theme-border p-6 sm:p-8 shadow-premium relative text-left max-w-md w-full">
+            <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-theme-accent" />
+            <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-theme-accent" />
+
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-theme-bg-surface border border-theme-border rounded-full">
+                  <KeyRound size={18} className="text-theme-accent" />
+                </div>
+                <div>
+                  <span className="block text-[8px] tracking-[0.25em] text-theme-accent uppercase font-semibold">
+                    SECURITY CREDENTIALS
+                  </span>
+                  <h2 className="font-serif text-lg text-theme-text">Change Password</h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChangingPassword(false);
+                  setChangePasswordStatus(null);
+                }}
+                className="p-1.5 text-theme-text-muted hover:text-theme-text transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {adminEmail && (
+              <p className="text-xs text-theme-text-muted leading-relaxed mb-5 font-sans">
+                Update account password for <strong className="text-theme-text font-medium">{adminEmail}</strong>.
+              </p>
+            )}
+
+            {changePasswordStatus && (
+              <div
+                className={`p-3 text-xs flex items-start gap-2 mb-5 border ${
+                  changePasswordStatus.type === 'error'
+                    ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                }`}
+              >
+                {changePasswordStatus.type === 'error' ? (
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
+                )}
+                <span>{changePasswordStatus.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} autoComplete="off" className="flex flex-col gap-4 text-xs">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] tracking-[0.2em] text-theme-text-muted uppercase font-semibold">
+                  Current Password <span className="text-theme-accent">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={currentPasswordInput}
+                  onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                  className="py-2.5 bg-transparent border-b border-theme-border-medium focus:border-theme-accent outline-none text-theme-text font-medium"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] tracking-[0.2em] text-theme-text-muted uppercase font-semibold">
+                  New Password (Min 8 characters) <span className="text-theme-accent">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  className="py-2.5 bg-transparent border-b border-theme-border-medium focus:border-theme-accent outline-none text-theme-text font-medium"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] tracking-[0.2em] text-theme-text-muted uppercase font-semibold">
+                  Confirm New Password <span className="text-theme-accent">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={confirmNewPasswordInput}
+                  onChange={(e) => setConfirmNewPasswordInput(e.target.value)}
+                  className="py-2.5 bg-transparent border-b border-theme-border-medium focus:border-theme-accent outline-none text-theme-text font-medium"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-theme-border">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsChangingPassword(false);
+                    setChangePasswordStatus(null);
+                  }}
+                  className="px-4 py-2 border border-theme-border text-[9px] tracking-wider uppercase text-theme-text-muted hover:text-theme-text transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPassword}
+                  className="bg-theme-text text-theme-bg py-2.5 px-6 font-sans text-[10px] tracking-[0.25em] uppercase font-semibold hover:bg-theme-accent hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isSubmittingPassword ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    'Change Password'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

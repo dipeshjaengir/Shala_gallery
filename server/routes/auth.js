@@ -251,6 +251,92 @@ router.get('/me', requireAdmin, (req, res) => {
   });
 });
 
+// POST /api/auth/change-password - Protected: Authenticated administrator changes their own password
+router.post('/change-password', requireAdmin, loginLimiter, async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+
+  if (
+    !currentPassword ||
+    !newPassword ||
+    !confirmPassword ||
+    typeof currentPassword !== 'string' ||
+    typeof newPassword !== 'string' ||
+    typeof confirmPassword !== 'string'
+  ) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Current password, new password, and confirmation are required.',
+    });
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'New password and confirmation do not match.',
+    });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'New password must be at least 8 characters long.',
+    });
+  }
+
+  if (currentPassword === newPassword) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'New password must be different from your current password.',
+    });
+  }
+
+  try {
+    const admin = await Admin.findOne({ email: req.admin.email });
+
+    if (!admin) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Administrator account not found.',
+      });
+    }
+
+    const isMatch = await admin.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Current password is incorrect.',
+      });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    admin.passwordHash = await bcrypt.hash(newPassword, salt);
+    admin.isConfigured = true;
+    admin.resetTokenHash = null;
+    admin.resetTokenExpires = null;
+    admin.setupTokenHash = null;
+    admin.setupTokenExpires = null;
+    admin.failedLoginAttempts = 0;
+    admin.lockUntil = null;
+    await admin.save();
+
+    console.log(`[Auth] Password changed successfully for ${admin.email}`);
+
+    // Re-issue session token
+    const token = signAdminToken(admin.email);
+    res.cookie('shala_admin_token', token, getSessionCookieOptions());
+
+    res.json({
+      status: 'ok',
+      message: 'Your password has been changed successfully.',
+      token,
+      email: admin.email,
+    });
+  } catch (error) {
+    console.error('[Change Password Error]', error.message);
+    res.status(500).json({ status: 'error', message: 'Failed to update password.' });
+  }
+});
+
 // GET /api/auth/verify-reset-token - Check if reset token is valid
 router.get('/verify-reset-token', loginLimiter, async (req, res) => {
   const { token } = req.query;
